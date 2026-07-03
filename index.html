@@ -603,31 +603,26 @@ function getUnitName(k, lvl){
 }
 
 // ========= セーブ＆ロード機能 =========
-function saveData() { localStorage.setItem('shogiChessSaveData', JSON.stringify(state)); }
-function loadData() {
-    let saved = localStorage.getItem('shogiChessSaveData');
-    if(saved) {
-        try {
-            let parsed = JSON.parse(saved);
-            if(parsed.unlockedUnits) Object.assign(state.unlockedUnits, parsed.unlockedUnits);
-            if(parsed.unitLevels) Object.assign(state.unitLevels, parsed.unitLevels);
-            state.baseUpgrades = Object.assign({fundSpeed:1,towerHp:1,initialWallet:1,accounting:1,xpBonus:1,coinBonus:1}, parsed.baseUpgrades);
-            if(parsed.stageClearCounts) Object.assign(state.stageClearCounts, parsed.stageClearCounts);
-            if(parsed.treasures) Object.assign(state.treasures, parsed.treasures);
-            if(parsed.defeatedEnemies) Object.assign(state.defeatedEnemies, parsed.defeatedEnemies);
-            if(parsed.deck) state.deck = parsed.deck;
-            if(parsed.gachaHistory) state.gachaHistory = parsed.gachaHistory;
-            
-            if(parsed.playerXP !== undefined) state.playerXP = parsed.playerXP;
-            if(parsed.coins !== undefined) state.coins = parsed.coins;
-            if(parsed.diamonds !== undefined) state.diamonds = parsed.diamonds;
-            if(parsed.volume !== undefined) state.volume = parsed.volume;
-            if(parsed.unlockedStage !== undefined) state.unlockedStage = Math.max(state.unlockedStage, parsed.unlockedStage);
-            if(parsed.unlockedEventStage !== undefined) state.unlockedEventStage = Math.max(state.unlockedEventStage, parsed.unlockedEventStage);
-            if(parsed.unlockedBossStage !== undefined) state.unlockedBossStage = Math.max(state.unlockedBossStage, parsed.unlockedBossStage);
-        } catch(e) {}
-    }
-    bgmPlayer.volume = state.volume;
+function saveData() { 
+    // 戦闘中のデータ（キャラクターの座標や状態）は除外し、必要なデータだけを安全に保存する
+    let persistentState = {
+        unlockedStage: state.unlockedStage,
+        unlockedEventStage: state.unlockedEventStage,
+        unlockedBossStage: state.unlockedBossStage,
+        playerXP: state.playerXP,
+        coins: state.coins,
+        diamonds: state.diamonds,
+        volume: state.volume,
+        stageClearCounts: state.stageClearCounts,
+        treasures: state.treasures,
+        defeatedEnemies: state.defeatedEnemies,
+        unitLevels: state.unitLevels,
+        unlockedUnits: state.unlockedUnits,
+        deck: state.deck,
+        baseUpgrades: state.baseUpgrades,
+        gachaHistory: state.gachaHistory
+    };
+    localStorage.setItem('shogiChessSaveData', JSON.stringify(persistentState)); 
 }
 function resetSaveData() {
     if(confirm("本当にセーブデータをリセットして最初からやり直しますか？\n※この操作は取り消せません！")) {
