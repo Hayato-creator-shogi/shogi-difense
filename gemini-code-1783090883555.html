@@ -1435,3 +1435,147 @@ function performAttackAnim(att){
 function gameLoop(){
     if(state.isGameOver) return;
     let cfg=state.stageType==='main'?STAGE_CONFIGS[state.currentStage]:(state.stageType==='event'?EVENT_STAGE_CONFIGS[state.currentStage]:BOSS_STAGE_CONFIGS
+
+                                                                        function gameLoop(){
+    if(state.isGameOver) return;
+    let cfg=state.stageType==='main'?STAGE_CONFIGS[state.currentStage]:(state.stageType==='event'?EVENT_STAGE_CONFIGS[state.currentStage]:BOSS_STAGE_CONFIGS[state.currentStage]);
+    const stW=cfg.stageWidth;
+
+    state.p1.funds+=cfg.enemyFundSpeed||0; state.p2.funds+=(0.8+(state.baseUpgrades.fundSpeed-1)*0.5+(state.walletLevel-1)*0.8); if(state.p2.funds>state.p2.maxFunds)state.p2.funds=state.p2.maxFunds;
+    document.getElementById('funds-p2').innerText=Math.floor(state.p2.funds); document.getElementById('max-funds-p2').innerText=state.p2.maxFunds;
+
+    const wb=document.getElementById('wallet-btn'); if(wb) wb.disabled = state.walletLevel>=10 || state.p2.funds < state.walletLevel*300;
+    const bb=document.getElementById('ally-buff-btn'); if(bb) bb.disabled = state.inBattleBuffLevel>=10 || state.p2.funds < getBuffCost(state.inBattleBuffLevel);
+
+    unitKeys.forEach(t=>{if(state.p1Cooldowns[t]>0)state.p1Cooldowns[t]--;});
+    for(let i=0;i<10;i++){
+        if(state.p2Cooldowns[i]>0)state.p2Cooldowns[i]--;
+        const t=state.deck[i]; if(t&&state.unlockedUnits[t]){
+            const btn=document.getElementById(`btn-slot-${i}`); const cdBar=document.getElementById(`cd-bar-${i}`);
+            if(btn&&cdBar){ cdBar.style.height=(UNIT_TYPES[t].spawnCooldown>0?(state.p2Cooldowns[i]/UNIT_TYPES[t].spawnCooldown)*100:0)+'%'; btn.disabled=(state.p2.funds<UNIT_TYPES[t].cost||state.p2Cooldowns[i]>0); }
+        }
+    }
+
+    if(state.stageType==='main'){
+        let av=unitKeys.filter(t=>!UNIT_TYPES[t].isGacha&&UNIT_TYPES[t].reqStage<=state.currentStage&&state.p1Cooldowns[t]<=0&&state.p1.funds>=UNIT_TYPES[t].cost);
+        if(state.currentStage===1)av=av.filter(t=>t==='歩');
+        if(Math.random()<cfg.enemySpawnRate && av.length>0) {
+            let sw = false; let sr = false; let sb = false;
+            let cs = state.currentStage;
+            if (cs >= 25) {
+                if (Math.random() < 0.5) sr = true; else sb = true;
+            } else if (cs >= 21) {
+                let blueProb = (cs - 20) * 0.1;
+                let rnd = Math.random();
+                if (rnd < blueProb) sb = true;
+                else if (rnd < blueProb + 0.3) sr = true;
+                else if (rnd < blueProb + 0.6) sw = true;
+            } else if (cs >= 11) {
+                if(Math.random() < 0.5) sw = true; else sr = true;
+            } else {
+                if(cs>=8&&Math.random()<0.3) sw = true;
+            }
+            spawnUnit('p1',av[Math.floor(Math.random()*av.length)],false,0,sw,false,sr,sb,-1);
+        }
+    }
+
+    for(let i=0;i<state.units.length;i++){
+        let u1=state.units[i]; if(u1.isDying){u1.deathTimer--;continue;}
+        if(u1.hp<=0){
+            u1.isDying=true; u1.deathTimer=24; u1.element.classList.remove('attacking'); u1.element.classList.add(u1.player==='p1'?'dying-p1':'dying-p2');
+
+            if(u1.isBlue && u1.lastAttacker && u1.lastAttacker.hp > 0 && !u1.lastAttacker.isDying) {
+                let reflectDmg = Math.floor(u1.lastAttacker.maxHp * 0.05);
+                u1.lastAttacker.hp -= reflectDmg;
+            }
+
+            if(u1.player==='p1'&&u1.isBoss) state.p1.hp=0;
+
+            if(u1.player==='p1'&&!u1.isBoss&&UNIT_TYPES[u1.type].rarity==='Basic'){
+                const dk = u1.isBlue ? (u1.type+'_blue') : (u1.isRed ? (u1.type+'_red') : (u1.isWhite ? (u1.type+'_white') : u1.type));
+                state.defeatedEnemies[dk] = (state.defeatedEnemies[dk]||0)+1;
+            }
+
+            if(!u1.noReward){
+                let rw=Math.floor(UNIT_TYPES[u1.type].cost/2);
+                if(u1.player==='p1'){
+                    let accBonus = 1 + (state.baseUpgrades.accounting - 1) * 0.1;
+                    let walletAccBonus = 1 + (state.walletLevel - 1) * 0.1;
+                    rw = Math.floor(rw * accBonus * walletAccBonus);
+                    state.p2.funds+=rw; if(state.p2.funds>state.p2.maxFunds)state.p2.funds=state.p2.maxFunds;
+                }else state.p1.funds+=rw;
+            }
+            continue;
+        }
+
+        let cm=true; let tgs=[]; let c1=u1.x+u1.size/2; let rng=u1.range||0; const p2b=stW-90; const p1b=90; let bd=u1.player==='p1'?(p2b-(u1.x+u1.size)):(u1.x-p1b); let hb=false;
+        if(bd<=rng){ cm=false; hb=true; }
+        for(let j=0;j<state.units.length;j++){
+            let u2=state.units[j]; if(i===j||u2.hp<=0||u2.isDying)continue;
+            if(u1.player!==u2.player){ let c2=u2.x+u2.size/2; if(Math.abs(c1-c2)-(u1.size/2+u2.size/2)<=rng){cm=false;tgs.push(u2);} }
+        }
+
+        if(!cm && u1.cooldown<=0){
+            let dmg=performAttackAnim(u1); tgs.sort((a,b)=>Math.abs(c1-(a.x+a.size/2))-Math.abs(c1-(b.x+b.size/2)));
+            if(u1.aoe>0){
+                let ac=u1.player==='p1'?(u1.x+u1.size+rng):(u1.x-rng); if(tgs.length>0) ac=tgs[0].x+tgs[0].size/2; else if(hb) ac=u1.player==='p1'?p2b:p1b;
+                state.units.forEach(ou=>{if(ou.player!==u1.player&&ou.hp>0&&!ou.isDying&&Math.abs((ou.x+ou.size/2)-ac)-ou.size/2<=u1.aoe) damageUnit(ou,dmg,stW,u1);});
+                if(u1.player==='p1'&&Math.abs(p2b-ac)<=u1.aoe) state.p2.hp-=dmg; if(u1.player==='p2'&&Math.abs(p1b-ac)<=u1.aoe) state.p1.hp-=dmg;
+            }else{
+                let hl=u1.multiHit||1; for(let k=0;k<tgs.length&&hl>0;k++){damageUnit(tgs[k],dmg,stW,u1);hl--;}
+                if(hb&&hl>0){if(u1.player==='p1')state.p2.hp-=dmg;if(u1.player==='p2')state.p1.hp-=dmg;}
+            }
+        }
+        if(cm) u1.x+=u1.speed; if(u1.cooldown>0) u1.cooldown--; if(!u1.isDying) u1.element.style.left=u1.x+'px';
+    }
+
+    state.units=state.units.filter(u=>{if(u.isDying&&u.deathTimer<=0){u.element.remove();return false;}return true;});
+    document.getElementById('hp-p1').innerText=Math.max(0,state.p1.hp); document.getElementById('hp-p2').innerText=Math.max(0,state.p2.hp);
+
+    if(state.p1.hp<=0 && !state.isGameOver){
+        state.isGameOver=true; let isF=false; let epi=false;
+
+        let sk=state.stageType+'_'+state.currentStage; let cc=state.stageClearCounts[sk]||0;
+        let isFirstClear = (cc === 0);
+
+        if(state.stageType==='main'){ if(state.currentStage===state.unlockedStage){if(state.unlockedStage<=30)isF=true;if(state.unlockedStage<30)state.unlockedStage++;else if(state.unlockedStage===30){state.unlockedStage=31;epi=true;}} }
+        else if(state.stageType==='event'){ if(state.currentStage===state.unlockedEventStage&&state.unlockedEventStage<10)state.unlockedEventStage++; }
+        else if(state.stageType==='boss'){ if(state.currentStage===state.unlockedBossStage&&state.unlockedBossStage<20)state.unlockedBossStage++; }
+
+        let bx=cfg.xpReward;
+        let jt=0.9+(Math.random()*0.2); let dc=Math.max(0.1,Math.pow(0.75,cc));
+
+        let ex = Math.floor((bx / 3) * dc * jt);
+        let ec = Math.floor((bx / 100) * dc * jt) + Math.floor(Math.random() * 5);
+
+        ex = Math.floor(ex * (1 + (state.baseUpgrades.xpBonus - 1) * 0.1));
+        ec = Math.floor(ec * (1 + (state.baseUpgrades.coinBonus - 1) * 0.1));
+
+        state.playerXP+=ex; state.coins+=ec; state.stageClearCounts[sk]=cc+1;
+        if(isFirstClear) state.diamonds += (state.stageType === 'boss' ? 3 : 1);
+
+        let tr=null;
+        if(state.stageType==='main'){
+            let r=Math.random(); let ct=cfg.treasures; if(!state.treasures[state.currentStage])state.treasures[state.currentStage]={};
+            if(r<0.02){tr={rarity:'gold',name:ct.gold,color:'#ffd700'};state.treasures[state.currentStage].gold=true;}else if(r<0.10){tr={rarity:'silver',name:ct.silver,color:'#c0c0c0'};state.treasures[state.currentStage].silver=true;}else if(r<0.30){tr={rarity:'copper',name:ct.copper,color:'#b87333'};state.treasures[state.currentStage].copper=true;}
+        }
+
+        saveData();
+
+        const rd={xp:ex,coins:ec,treasure:tr, isFirst: isFirstClear}; const bp1=document.getElementById('base-p1'); if(bp1)bp1.classList.add('collapsed-base-p1');
+        state.resultTimeoutId=setTimeout(()=>{if(epi)showEpilogue(rd);else showResultOverlay(true,rd.xp,rd.coins,rd.treasure,isF, rd.isFirst);},1500); return;
+    }else if(state.p2.hp<=0 && !state.isGameOver){
+        state.isGameOver=true; const bp2=document.getElementById('base-p2'); if(bp2)bp2.classList.add('collapsed-base-p2');
+        state.resultTimeoutId=setTimeout(()=>showResultOverlay(false,0,0,null,false, false),1500); return;
+    }
+    if(!state.isGameOver) state.animationId=requestAnimationFrame(gameLoop);
+}
+
+// 起動時の処理
+renderCombos();
+loadData();
+changeScreen('title-screen');
+
+</script>
+</body>
+</html>
