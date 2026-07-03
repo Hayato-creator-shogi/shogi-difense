@@ -1434,10 +1434,6 @@ function performAttackAnim(att){
 
 function gameLoop(){
     if(state.isGameOver) return;
-    let cfg=state.stageType==='main'?STAGE_CONFIGS[state.currentStage]:(state.stageType==='event'?EVENT_STAGE_CONFIGS[state.currentStage]:BOSS_STAGE_CONFIGS
-
-                                                                        function gameLoop(){
-    if(state.isGameOver) return;
     let cfg=state.stageType==='main'?STAGE_CONFIGS[state.currentStage]:(state.stageType==='event'?EVENT_STAGE_CONFIGS[state.currentStage]:BOSS_STAGE_CONFIGS[state.currentStage]);
     const stW=cfg.stageWidth;
 
